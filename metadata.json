@@ -1,0 +1,6 @@
+{
+  "name": "Container Terminal Planning Assistant",
+  "description": "A modern AI-powered decision-support dashboard for container terminal planning, analyzing vessel operations, yard congestion, and crane allocation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
