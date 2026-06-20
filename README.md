@@ -1,72 +1,20 @@
-# Container Terminal Planning Assistant
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+</div>
 
-## Overview
+# Run and deploy your AI Studio app
 
-Container Terminal Planning Assistant is an AI-powered decision support prototype designed to assist container terminal planners in analysing vessel operations, resource allocation, yard planning considerations, and operational risks.
+This contains everything you need to run your app locally.
 
-The application demonstrates how modern AI technologies can support planning activities in complex maritime and logistics environments by generating operational recommendations and planning insights from user-provided terminal and vessel information.
+View your app in AI Studio: https://ai.studio/apps/dfd34492-b0d3-49b9-841b-813433631064
 
-## Key Features
+## Run Locally
 
-* Vessel operation planning support
-* Container loading and discharge analysis
-* Quay crane allocation recommendations
-* Yard congestion assessment
-* Operational risk identification
-* Bottleneck analysis
-* Mitigation strategy suggestions
-* AI-generated planning summaries
-* Decision support recommendations
+**Prerequisites:**  Node.js
 
-## Technologies
 
-* Google AI Studio
-* Gemini
-* TypeScript
-* Web Application Architecture
-* Cloud Run (Deployment Testing)
-
-## Use Cases
-
-* Container terminal operations planning
-* Vessel turnaround planning
-* Resource allocation support
-* Operational decision support
-* Maritime logistics education and research
-* AI-assisted planning demonstrations
-
-## Project Status
-
-**Current Status:** Prototype
-
-* Application successfully generated using Google AI Studio
-* User interface and planning workflow implemented
-* Preview environment operational
-* Deployment testing in progress
-* Future enhancements planned
-
-## Research Context
-
-This prototype aligns with ongoing research interests in:
-
-* AI-Powered Decision Support Systems
-* Human-Centred AI
-* Explainable AI for Operational Planning
-* Maritime Logistics and Container Terminal Operations
-* AI for Complex Socio-Technical Systems
-
-## Future Enhancements
-
-* Real-time operational data integration
-* Multi-agent planning workflows
-* Digital Twin integration
-* Explainable AI recommendations
-* Scenario simulation and optimisation
-* Advanced resource scheduling
-* Performance analytics dashboard
-
-## Author
-
-Kaveh Hakimi Firooz
-
-Developed during Google's **5-Day AI Agents Intensive Course** as part of an exploration into AI-powered operational decision support systems.
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`

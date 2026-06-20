@@ -86,7 +86,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [planResult, setPlanResult] = useState<TerminalPlanningOutput | null>(null);
-  const [activeTab, setActiveTab] = useState<'all' | 'cranes' | 'yard' | 'risks'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'vessel' | 'cranes' | 'yard' | 'risks' | 'decision'>('all');
   const [copied, setCopied] = useState(false);
   const [activeHotspot, setActiveHotspot] = useState<string | null>(null);
 
@@ -754,258 +754,469 @@ PORT TERMINAL AUTOMATION PLANNER DECISION-SUPPORT REPORT`;
           ) : planResult ? (
             <div className="space-y-6">
               
-              {/* Metrics Highlights Header Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                
-                {/* 1. Operation Duration Card */}
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 relative overflow-hidden shadow-md">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-sky-500/5 rounded-full -translate-y-6 translate-x-6"></div>
-                  <div className="flex items-center gap-3 text-slate-400 text-xs font-semibold mb-2 uppercase tracking-wide">
-                    <Clock className="w-4 h-4 text-sky-400" />
-                    <span>Est. Turnaround Cycles</span>
+              {/* Dynamic Port Metrics Summary Header */}
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Est. Duration</span>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-xl font-mono font-bold text-sky-400">{planResult.estimatedDuration}</span>
+                    <span className="text-[10px] text-slate-500">hrs</span>
                   </div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-mono font-bold text-white">
-                      {planResult.estimatedDuration}
-                    </span>
-                    <span className="text-slate-400 text-sm font-medium">hours</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-2">
-                    Total berth occupancy for safety clearance margin.
-                  </p>
                 </div>
-
-                {/* 2. Planning Safety index */}
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 relative overflow-hidden shadow-md">
-                  <div className={`absolute top-0 right-0 w-24 h-24 rounded-full -translate-y-6 translate-x-6 ${
-                    planResult.safetyIndex > 80 ? "bg-emerald-500/5" : "bg-amber-500/5"
-                  }`}></div>
-                  <div className="flex items-center gap-3 text-slate-400 text-xs font-semibold mb-2 uppercase tracking-wide">
-                    <Gauge className="w-4 h-4 text-sky-400" />
-                    <span>Plan Stability Index</span>
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Assigned QCs</span>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-xl font-mono font-bold text-white">{inputs.cranesCount}</span>
+                    <span className="text-[10px] text-slate-500 font-medium text-slate-400">cranes</span>
                   </div>
-                  <div className="flex items-baseline gap-1">
-                    <span className={`text-3xl font-mono font-bold ${
-                      planResult.safetyIndex > 80 ? "text-emerald-400" : "text-amber-400"
-                    }`}>
-                      {planResult.safetyIndex}%
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-2">
-                    Predicted buffer cushion against unexpected crane downtime.
-                  </p>
                 </div>
-
-                {/* 3. Post Ops Congestion Level */}
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 relative overflow-hidden shadow-md">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-teal-500/5 rounded-full -translate-y-6 translate-x-6"></div>
-                  <div className="flex items-center gap-3 text-slate-400 text-xs font-semibold mb-2 uppercase tracking-wide">
-                    <Layers className="w-4 h-4 text-sky-400" />
-                    <span>Post-Ops Congestion Risk</span>
-                  </div>
-                  <div className="flex items-baseline gap-1">
-                    <span className={`text-3xl font-mono font-bold ${
-                      planResult.congestionIndex > 75 ? "text-red-400" : planResult.congestionIndex > 45 ? "text-amber-400" : "text-emerald-400"
-                    }`}>
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Post-Ops Congestion</span>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className={`text-xl font-mono font-bold ${planResult.congestionIndex > 75 ? 'text-red-400' : planResult.congestionIndex > 45 ? 'text-amber-400' : 'text-emerald-400'}`}>
                       {planResult.congestionIndex}%
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-2">
-                    Yard saturation forecast upon unloading completion.
-                  </p>
                 </div>
-
-                {/* 4. Priority Class Status Card */}
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 relative overflow-hidden shadow-md">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-full -translate-y-6 translate-x-6"></div>
-                  <div className="flex items-center gap-3 text-slate-400 text-xs font-semibold mb-2 uppercase tracking-wide">
-                    <Anchor className="w-4 h-4 text-sky-400" />
-                    <span>Assigned Priority Class</span>
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Stability Index</span>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-xl font-mono font-bold text-teal-400">{planResult.safetyIndex}%</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`inline-block w-2 h-2 rounded-full ${
-                      inputs.priority === 'Critical' ? "bg-red-500 animate-ping" : inputs.priority === 'Urgent' ? "bg-amber-400" : "bg-sky-450"
-                    }`}></span>
-                    <span className={`text-xl font-mono font-bold ${
-                      inputs.priority === 'Critical' ? "text-red-400" : inputs.priority === 'Urgent' ? "text-amber-400" : "text-slate-200"
-                    }`}>
-                      {inputs.priority.toUpperCase()}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-3">
-                    Berth preference priority ranking coefficient.
-                  </p>
                 </div>
-
+                <div className="bg-slate-900 border border-slate-800 rounded-xl col-span-2 lg:col-span-1 p-3.5 flex flex-col justify-between">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Priority Rank</span>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className={`w-2 h-2 rounded-full ${inputs.priority === 'Critical' ? 'bg-red-500 animate-pulse' : 'bg-sky-400'}`}></span>
+                    <span className="text-xs font-mono font-bold text-slate-200">{inputs.priority}</span>
+                  </div>
+                </div>
               </div>
 
-              {/* Subtabs to navigate details */}
-              <div className="flex border-b border-slate-800 gap-1.5 overflow-x-auto pb-1">
+              {/* Subtabs to navigate dynamic Multi-Skill sections */}
+              <div className="flex border-b border-slate-800 gap-1 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
                 {[
-                  { id: 'all', label: 'Complete Breakdown' },
-                  { id: 'cranes', label: 'QC Allocations' },
-                  { id: 'yard', label: 'Yard Strategy' },
-                  { id: 'risks', label: 'Risk & Bottlenecks' }
-                ].map(tab => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
-                    className={`px-4 py-2.5 text-xs font-semibold rounded-t-xl transition-all border-b-2 whitespace-nowrap ${
-                      activeTab === tab.id 
-                        ? "border-sky-500 text-sky-400 bg-sky-500/5" 
-                        : "border-transparent text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
+                  { id: 'all', label: 'All Skills Dashboard', icon: Sparkles },
+                  { id: 'vessel', label: '1. Vessel Planning', icon: Ship },
+                  { id: 'cranes', label: '2. Crane Allocation', icon: Anchor },
+                  { id: 'yard', label: '3. Yard Planning', icon: Layers },
+                  { id: 'risks', label: '4. Risk Assessment', icon: AlertTriangle },
+                  { id: 'decision', label: '5. Decision Support', icon: Compass }
+                ].map(tab => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id as any)}
+                      className={`px-3 py-2 text-xs font-semibold rounded-t-xl transition-all border-b-2 whitespace-nowrap flex items-center gap-2 ${
+                        activeTab === tab.id 
+                          ? "border-sky-500 text-sky-400 bg-sky-500/5 font-bold" 
+                          : "border-transparent text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
               </div>
 
-              {/* Main Content Grid of Tabs */}
+              {/* Multi-Skill Output Sections */}
               <div className="space-y-6">
-                
-                {/* Human-Readable Summary Narrative (Always prominent since notes/summaries are vital) */}
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:p-6 shadow">
-                  <h3 className="text-sm font-semibold text-sky-400 uppercase tracking-wide mb-3 flex items-center gap-2">
-                    <FileText className="w-4 h-4" />
-                    Executive Operations Planning Summary
-                  </h3>
-                  <div id="narrative-summary" className="prose prose-invert max-w-none text-xs md:text-sm text-slate-350 leading-relaxed space-y-3 font-sans">
-                    <p className="whitespace-pre-wrap">{planResult.humanPlanningSummary}</p>
-                  </div>
-                </div>
 
-                {/* Tab content filtering */}
-                {(activeTab === 'all' || activeTab === 'cranes') && (
-                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:p-6 shadow space-y-4">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                      <h4 className="text-sm font-semibold text-white flex items-center gap-2">
-                        <Anchor className="w-4 h-4 text-sky-400" />
-                        Quay Crane Allocation Recommendations
-                      </h4>
-                      <span className="text-[10px] bg-sky-500/10 px-2 py-0.5 rounded text-sky-400 font-mono">
-                        {planResult.quayCraneAllocation.length} Cranes Active
-                      </span>
+                {/* 1. VESSEL PLANNING SKILL CONTROLLER */}
+                {(activeTab === 'all' || activeTab === 'vessel') && (
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:p-6 shadow-lg relative overflow-hidden transition-all hover:border-slate-750">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-sky-500/[0.015] rounded-full -translate-y-8 translate-x-8"></div>
+                    
+                    {/* Skill Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4 mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-sky-500/10 border border-sky-500/20 text-sky-400 rounded-xl">
+                          <Ship className="w-5 h-5 text-sky-400" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-mono uppercase bg-sky-500/10 text-sky-400 px-2 py-0.5 rounded font-semibold border border-sky-500/10">SKILL 01</span>
+                            <h3 className="text-sm font-semibold text-white tracking-wide">Vessel Planning Skill</h3>
+                          </div>
+                          <p className="text-xs text-slate-400 mt-0.5">Analyse vessel workload distribution and estimate operation turnaround cycles.</p>
+                        </div>
+                      </div>
+                      <div className="bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-850 text-right shrink-0">
+                        <span className="text-[9px] text-slate-500 block uppercase font-semibold">Calculated Turnaround</span>
+                        <span className="text-xs font-mono font-bold text-sky-400">{planResult.estimatedDuration} Hrs Total</span>
+                      </div>
                     </div>
 
+                    {/* Skill Core Workspace */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+                      
+                      {/* Vessel Load Breakdown & Data */}
+                      <div className="md:col-span-7 space-y-4">
+                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-3">
+                          <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Workload Scenario Profile</h4>
+                          
+                          <div className="grid grid-cols-2 gap-4 text-xs font-mono">
+                            <div className="space-y-1">
+                              <span className="text-slate-500 text-[11px]">Vessel Name</span>
+                              <span className="text-slate-200 block truncate font-medium">{inputs.vesselName}</span>
+                            </div>
+                            <div className="space-y-1">
+                              <span className="text-slate-500 text-[11px]">Priority Category</span>
+                              <span className={`block font-bold ${inputs.priority === 'Critical' ? 'text-red-400 animate-pulse' : inputs.priority === 'Urgent' ? 'text-amber-400' : 'text-sky-400'}`}>{inputs.priority.toUpperCase()}</span>
+                            </div>
+                            <div className="space-y-1">
+                              <span className="text-slate-500 text-[11px]">Discharge Count</span>
+                              <span className="text-slate-200 block font-medium">{inputs.dischargeCount} TEUs</span>
+                            </div>
+                            <div className="space-y-1">
+                              <span className="text-slate-500 text-[11px]">Load Count</span>
+                              <span className="text-slate-200 block font-medium">{inputs.loadCount} TEUs</span>
+                            </div>
+                          </div>
+
+                          {/* Load vs Discharge Progress Bar Visualizer */}
+                          <div className="pt-2">
+                            <div className="flex justify-between text-[11px] font-mono mb-1">
+                              <span className="text-sky-400 font-medium">Discharge ({Math.round(inputs.dischargeCount / (inputs.dischargeCount + inputs.loadCount || 1) * 100)}%)</span>
+                              <span className="text-indigo-400 font-medium">Load ({Math.round(inputs.loadCount / (inputs.dischargeCount + inputs.loadCount || 1) * 100)}%)</span>
+                            </div>
+                            <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden flex border border-slate-800">
+                              <div style={{ width: `${(inputs.dischargeCount / (inputs.dischargeCount + inputs.loadCount || 1)) * 100}%` }} className="h-full bg-gradient-to-r from-sky-500 to-sky-450" />
+                              <div style={{ width: `${(inputs.loadCount / (inputs.dischargeCount + inputs.loadCount || 1)) * 100}%` }} className="h-full bg-gradient-to-r from-indigo-500 to-indigo-450" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Productivity & Density KPIs */}
+                      <div className="md:col-span-12 lg:col-span-5 space-y-4">
+                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-3 h-full flex flex-col justify-between">
+                          <div>
+                            <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Operations Density Index</h4>
+                            <div className="flex items-baseline gap-1 mt-1">
+                              <span className="text-3xl font-mono font-bold text-white">
+                                {((inputs.dischargeCount + inputs.loadCount) / planResult.estimatedDuration).toFixed(1)}
+                              </span>
+                              <span className="text-xs text-slate-455 font-mono">TEUs / hour</span>
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-slate-450 leading-normal">
+                            Predicted net berth operations intensity. Computes the combined cargo density of {inputs.dischargeCount + inputs.loadCount} Total TEUs against the estimated {planResult.estimatedDuration} turnaround hours.
+                          </p>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. QUAY CRANE ALLOCATION SKILL CONTROLLER */}
+                {(activeTab === 'all' || activeTab === 'cranes') && (
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:p-6 shadow-lg relative overflow-hidden transition-all hover:border-slate-750">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/[0.015] rounded-full -translate-y-8 translate-x-8"></div>
+                    
+                    {/* Skill Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4 mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl">
+                          <Anchor className="w-5 h-5 text-emerald-400" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-mono uppercase bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded font-semibold border border-emerald-505/10">SKILL 02</span>
+                            <h3 className="text-sm font-semibold text-white tracking-wide">Quay Crane Allocation Skill</h3>
+                          </div>
+                          <p className="text-xs text-slate-400 mt-0.5">Recommend optimal berth crane placements and identify critical asset shortages.</p>
+                        </div>
+                      </div>
+                      <div className="bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-850 text-right shrink-0">
+                        <span className="text-[9px] text-slate-500 block uppercase font-semibold">Active Cranes Allocated</span>
+                        <span className="text-xs font-mono font-bold text-emerald-400">{planResult.quayCraneAllocation.length} Deployable Units</span>
+                      </div>
+                    </div>
+
+                    {/* Shortage & Scarcity Assessment Banner */}
+                    <div className="mb-5">
+                      {inputs.cranesCount < 3 ? (
+                        <div className="bg-amber-500/5 border border-amber-500/25 p-4 rounded-xl flex items-start gap-3">
+                          <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                          <div className="space-y-1">
+                            <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">CRITICAL CRANE RESOURCE SHORTAGE</h4>
+                            <p className="text-xs text-amber-200/90 leading-relaxed">
+                              Vessel operations are bottlenecked by raw crane capacity ({inputs.cranesCount} QCs assigned). With {inputs.dischargeCount + inputs.loadCount} total containers, terminal berth occupancy is severely extended. We strongly recommend allocating a minimum of 3 cranes to scale down cyclic turnaround times.
+                            </p>
+                          </div>
+                        </div>
+                      ) : inputs.craneProductivity < 25 ? (
+                        <div className="bg-amber-500/5 border border-amber-500/20 p-4 rounded-xl flex items-start gap-3">
+                          <Info className="w-5 h-5 text-amber-450 shrink-0 mt-0.5" />
+                          <div className="space-y-1">
+                            <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">EFFICIENCY COEFFICIENT ADV_LIMITATION</h4>
+                            <p className="text-xs text-amber-200/90 leading-relaxed">
+                              Crane productivity indices ({inputs.craneProductivity} gross moves/hour) are below optimal deep-sea hub baselines. Stagger gate chassis configurations to avoid crane-cycle starvation on the lashing panels.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-emerald-500/5 border border-emerald-500/15 p-4 rounded-xl flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-450 shrink-0 mt-0.5" />
+                          <div className="space-y-1">
+                            <h4 className="text-xs font-bold text-emerald-450 uppercase tracking-wider">QUAY RESOURCE BALANCED CAPACITY SECURE</h4>
+                            <p className="text-xs text-slate-350 leading-relaxed">
+                              Crane deployments are optimal for container cargo intensity. Assigned {inputs.cranesCount} QCs operating at {inputs.craneProductivity} gross moves/hour guarantees maximum hatch velocity with minimal structural interference.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Crane Assignments Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {planResult.quayCraneAllocation.map((crane, idx) => (
-                        <div key={idx} className="bg-slate-950 p-4 rounded-xl border border-slate-850 flex items-start gap-3">
-                          <div className="bg-sky-500/10 p-2 text-sky-400 rounded-lg text-xs font-mono font-bold">
+                        <div key={idx} className="bg-slate-950 p-4 rounded-xl border border-slate-850 flex items-start gap-3 hover:border-slate-800 transition-colors">
+                          <div className="bg-emerald-500/10 p-2.5 text-emerald-400 rounded-lg text-xs font-mono font-bold shrink-0">
                             {crane.craneId}
                           </div>
-                          <div className="space-y-1">
+                          <div className="space-y-1.5 min-w-0">
                             <h5 className="font-semibold text-white text-xs">Work Segment Assignment</h5>
-                            <p className="text-xs text-slate-400 leading-relaxed">{crane.assignmentDetails}</p>
-                            <div className="flex items-center gap-1.5 mt-2 text-[10px] text-teal-400 font-mono">
-                              <span className="w-1.5 h-1.5 bg-teal-400 rounded-full"></span>
-                              KPI Standard: {crane.productivityKPI}
+                            <p className="text-xs text-slate-400 leading-relaxed break-words">{crane.assignmentDetails}</p>
+                            <div className="flex items-center gap-1.5 pt-1 text-[10px] text-teal-400 font-mono">
+                              <span className="w-1.5 h-1.5 bg-teal-450 rounded-full animate-pulse"></span>
+                              Target Standard: {crane.productivityKPI}
                             </div>
                           </div>
                         </div>
                       ))}
                     </div>
+
                   </div>
                 )}
 
+                {/* 3. YARD PLANNING SKILL CONTROLLER */}
                 {(activeTab === 'all' || activeTab === 'yard') && (
-                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:p-6 shadow space-y-4">
-                    <h4 className="text-sm font-semibold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
-                      <Layers className="w-4 h-4 text-sky-400" />
-                      Yard Planning Strategy & Storage Buffer considerations
-                    </h4>
-                    <div className="space-y-3">
-                      {planResult.yardPlanningConsiderations.map((consideration, idx) => (
-                        <div key={idx} className="flex gap-3 items-start text-xs md:text-sm text-slate-300">
-                          <span className="w-1.5 h-1.5 rounded-full bg-sky-400 mt-2 shrink-0"></span>
-                          <p className="leading-relaxed">{consideration}</p>
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:p-6 shadow-lg relative overflow-hidden transition-all hover:border-slate-755">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/[0.015] rounded-full -translate-y-8 translate-x-8"></div>
+                    
+                    {/* Skill Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4 mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 text-text-amber-400 rounded-xl">
+                          <Layers className="w-5 h-5 text-amber-400" />
                         </div>
-                      ))}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-mono uppercase bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded font-semibold border border-amber-500/10">SKILL 03</span>
+                            <h3 className="text-sm font-semibold text-white tracking-wide">Yard Planning Skill</h3>
+                          </div>
+                          <p className="text-xs text-slate-400 mt-0.5">Evaluate post-operations yard stacking occupancy risk and structure block routing coordinates.</p>
+                        </div>
+                      </div>
+                      <div className="bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-850 text-right shrink-0">
+                        <span className="text-[9px] text-slate-500 block uppercase font-semibold">Post-Ops Storage Impact</span>
+                        <span className="text-xs font-mono font-bold text-amber-400 text-amber-300">{inputs.congestion} Saturation</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+                      
+                      {/* Saturation progress bar detail */}
+                      <div className="md:col-span-12 lg:col-span-5 space-y-4">
+                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-4 flex flex-col justify-between h-full">
+                          <div>
+                            <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">Estimated Post-Ops Gridlock Risk</h4>
+                            
+                            <div className="flex items-baseline justify-between mt-3">
+                              <span className={`text-3xl font-mono font-bold ${planResult.congestionIndex > 75 ? 'text-red-400' : planResult.congestionIndex > 45 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                {planResult.congestionIndex}%
+                              </span>
+                              <span className="text-xs font-mono text-slate-505">Occupancy Forecast</span>
+                            </div>
+
+                            <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden mt-3 border border-slate-800">
+                              <div 
+                                style={{ width: `${planResult.congestionIndex}%` }} 
+                                className={`h-full rounded-full ${
+                                  planResult.congestionIndex > 75 
+                                    ? 'bg-gradient-to-r from-red-500 to-rose-400' 
+                                    : planResult.congestionIndex > 45 
+                                    ? 'bg-gradient-to-r from-amber-500 to-amber-400' 
+                                    : 'bg-gradient-to-r from-emerald-500 to-emerald-400'
+                                }`} 
+                              />
+                            </div>
+                          </div>
+
+                          <div className="bg-slate-900 p-3.5 rounded-lg border border-slate-850 text-[11px] text-slate-400 leading-normal font-sans">
+                            {planResult.congestionIndex > 75 ? (
+                              <span className="text-red-300 font-medium">⚠️ BLOCKS CRITICAL GRIDLOCK WARNING: Severe terminal saturation forecast. Direct imports might experience extreme shuffle-move delays.</span>
+                            ) : (
+                              <span className="text-emerald-300 font-medium">✅ OPTIMAL ACCELERATION PATTERN: Yard retains generous buffers to safely maintain continuous shift vehicle rotations.</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Strategic strategies list */}
+                      <div className="md:col-span-12 lg:col-span-7 space-y-4">
+                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-3">
+                          <h4 className="text-xs font-semibold text-slate-200 uppercase tracking-wider border-b border-slate-800 pb-2">Suggest Yard Allocation Strategies</h4>
+                          <div className="space-y-3">
+                            {planResult.yardPlanningConsiderations.map((consideration, idx) => (
+                              <div key={idx} className="flex gap-2.5 items-start text-xs text-slate-300">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 shrink-0"></span>
+                                <p className="leading-relaxed">{consideration}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
                     </div>
                   </div>
                 )}
 
+                {/* 4. RISK ASSESSMENT SKILL CONTROLLER */}
                 {(activeTab === 'all' || activeTab === 'risks') && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Risk & Bottlenecks Card */}
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:p-6 shadow space-y-4">
-                      <h4 className="text-sm font-semibold text-red-450 flex items-center gap-2 border-b border-slate-800 pb-3">
-                        <AlertTriangle className="w-4 h-4 text-red-500 animate-pulse" />
-                        Identified Risks & Operational Bottlenecks
-                      </h4>
-                      
-                      <div className="space-y-4">
-                        <div>
-                          <span className="text-[10px] uppercase font-bold text-red-400 tracking-wider">Predictive Bottlenecks</span>
-                          <div className="space-y-2 mt-2">
-                            {planResult.operationalBottlenecks.map((b, idx) => (
-                              <div key={idx} className="bg-slate-950 p-3 rounded-lg border border-slate-850 text-xs text-slate-300 flex items-start gap-2.5">
-                                <span className="font-mono text-slate-500 font-semibold">{idx+1}.</span>
-                                <span>{b}</span>
-                              </div>
-                            ))}
-                          </div>
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:p-6 shadow-lg relative overflow-hidden transition-all hover:border-slate-750">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/[0.015] rounded-full -translate-y-8 translate-x-8"></div>
+                    
+                    {/* Skill Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4 mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl">
+                          <AlertTriangle className="w-5 h-5 text-red-400 animate-pulse" />
                         </div>
-
                         <div>
-                          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Identified Risk Vectors</span>
-                          <div className="space-y-2 mt-2">
-                            {planResult.riskAssessment.map((risk, idx) => (
-                              <div key={idx} className="text-xs text-slate-400 flex items-start gap-2">
-                                <span className="text-amber-500 mt-1 shrink-0">⚠️</span>
-                                <span>{risk}</span>
-                              </div>
-                            ))}
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-mono uppercase bg-red-500/10 text-red-400 px-2 py-0.5 rounded font-semibold border border-red-505/10">SKILL 04</span>
+                            <h3 className="text-sm font-semibold text-white tracking-wide">Risk Assessment Skill</h3>
                           </div>
+                          <p className="text-xs text-slate-400 mt-0.5">Identify operational shipping risk vectors, evaluate quay interference, and assess logistics bottlenecks.</p>
                         </div>
+                      </div>
+                      <div className="bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-850 text-right shrink-0">
+                        <span className="text-[9px] text-slate-500 block uppercase font-semibold">Terminal Cushion Factor</span>
+                        <span className={`text-xs font-mono font-bold ${planResult.safetyIndex > 80 ? 'text-emerald-400' : 'text-amber-400'}`}>{planResult.safetyIndex}% Stability Index</span>
                       </div>
                     </div>
 
-                    {/* Alleviation/Mitigation Card */}
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:p-6 shadow space-y-4">
-                      <h4 className="text-sm font-semibold text-emerald-450 flex items-center gap-2 border-b border-slate-800 pb-3">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                        Suggested Tactical Mitigation Actions
-                      </h4>
-                      <p className="text-xs text-slate-400">
-                        Operational overrides which general planners should execute to prevent gate congestion or stack blocks overflow:
-                      </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       
-                      <div className="space-y-3">
-                        {planResult.suggestedMitigationActions.map((action, idx) => (
-                          <div key={idx} className="bg-emerald-900/10 border border-emerald-500/10 p-3.5 rounded-xl flex items-start gap-3">
-                            <span className="font-bold text-emerald-400 font-mono text-xs bg-slate-950 px-2 py-0.5 rounded border border-slate-850">
-                              ACTION-{idx+1}
-                            </span>
-                            <p className="text-xs text-slate-300 leading-relaxed">
-                              {action}
-                            </p>
-                          </div>
-                        ))}
+                      {/* Bottlenecks */}
+                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-3">
+                        <span className="text-[10px] uppercase font-bold text-red-400 tracking-wider block border-b border-slate-800 pb-2">PREDICTIVE TERMINAL BOTTLENECKS</span>
+                        <div className="space-y-2 mt-2">
+                          {planResult.operationalBottlenecks.map((b, idx) => (
+                            <div key={idx} className="bg-slate-900 p-2.5 rounded-lg border border-slate-850 text-xs text-slate-300 flex items-start gap-2.5">
+                              <span className="font-mono text-rose-500 font-bold text-[10px] bg-rose-500/10 px-1.5 py-0.2 rounded shrink-0">B{idx+1}</span>
+                              <span className="leading-relaxed text-[11px] md:text-xs">{b}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
+
+                      {/* Risks Vectors */}
+                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-3">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block border-b border-slate-800 pb-2">IDENTIFIED OPERATIONAL RISK VECTORS</span>
+                        <div className="space-y-2 mt-2">
+                          {planResult.riskAssessment.map((risk, idx) => (
+                            <div key={idx} className="text-xs text-slate-400 flex items-start gap-2.5 p-1.5">
+                              <span className="text-amber-500 mt-0.5 shrink-0 text-xs">⚠️</span>
+                              <span className="leading-relaxed text-[11px] md:text-xs">{risk}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
                     </div>
                   </div>
                 )}
 
-                {/* Final Decision Support Recommendation guidance banner */}
-                <div className="bg-gradient-to-r from-sky-650/40 via-indigo-650/30 to-slate-900 border border-sky-500/30 rounded-2xl p-5 md:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                  <div className="space-y-1 max-w-2xl">
-                    <div className="flex items-center gap-2">
-                      <ChevronRight className="w-5 h-5 text-sky-400" />
-                      <h4 className="font-display font-semibold text-white">Decision-Support Core Recommendation</h4>
+                {/* 5. DECISION SUPPORT SKILL CONTROLLER */}
+                {(activeTab === 'all' || activeTab === 'decision') && (
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:p-6 shadow-lg relative overflow-hidden transition-all hover:border-slate-750 font-sans">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-sky-500/[0.015] rounded-full -translate-y-8 translate-x-8"></div>
+                    
+                    {/* Skill Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4 mb-4 font-sans">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-sky-500/10 border border-sky-500/20 text-sky-400 rounded-xl">
+                          <Compass className="w-5 h-5 text-sky-450" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-mono uppercase bg-sky-500/10 text-sky-400 px-2 py-0.5 rounded font-semibold border border-sky-505/10">SKILL 05</span>
+                            <h3 className="text-sm font-semibold text-white tracking-wide">Decision Support Skill</h3>
+                          </div>
+                          <p className="text-xs text-slate-400 mt-0.5">Generate critical recommendations and produce an AI-synthesized executive summary.</p>
+                        </div>
+                      </div>
+                      <div className="bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-850 text-right shrink-0">
+                        <span className="text-[9px] text-slate-500 block uppercase font-semibold">Stowage Approval Seal</span>
+                        <span className="text-xs font-mono font-bold text-sky-400">TS-APPROVED-AI-77A</span>
+                      </div>
                     </div>
-                    <p className="text-xs text-slate-300 leading-relaxed">
-                      {planResult.decisionSupportRecommendation}
-                    </p>
+
+                    <div className="space-y-5">
+                      
+                      {/* Executive Operations Summary */}
+                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-855 space-y-3">
+                        <h4 className="text-xs font-semibold text-sky-400 uppercase tracking-wide flex items-center gap-2 border-b border-slate-800 pb-2">
+                          <FileText className="w-3.5 h-3.5" />
+                          Executive Ops multi-skill summary
+                        </h4>
+                        <div id="narrative-summary" className="text-xs md:text-sm text-slate-350 leading-relaxed font-sans font-normal whitespace-pre-wrap">
+                          {planResult.humanPlanningSummary}
+                        </div>
+                      </div>
+
+                      {/* Decision Support Core Recommendation Highlight Banner */}
+                      <div className="bg-gradient-to-r from-sky-950/80 via-slate-950 to-indigo-950/80 border border-sky-500/20 rounded-xl p-4.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <Compass className="w-4 h-4 text-sky-450 animate-spin" style={{ animationDuration: '6s' }} />
+                            <h4 className="text-xs font-bold uppercase text-white tracking-wide">Decision-Support Core Directive</h4>
+                          </div>
+                          <p className="text-xs text-slate-300 leading-relaxed max-w-2xl">
+                            {planResult.decisionSupportRecommendation}
+                          </p>
+                        </div>
+                        <div className="bg-slate-950 px-3.5 py-1.5 rounded-lg border border-slate-800 shrink-0 self-end sm:self-auto font-mono text-center">
+                          <span className="text-[9px] text-slate-500 uppercase block font-semibold">Reserve Buffer</span>
+                          <span className={`text-xs font-bold ${planResult.safetyIndex > 80 ? 'text-emerald-400' : 'text-amber-400'}`}>{planResult.safetyIndex}% Safety Index</span>
+                        </div>
+                      </div>
+
+                      {/* Tactical Action checklist */}
+                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-3">
+                        <h4 className="text-xs font-semibold text-emerald-450 uppercase tracking-wider flex items-center gap-2 border-b border-slate-800 pb-2">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                          Tactical Mitigation Commands Checklist
+                        </h4>
+                        <p className="text-xs text-slate-400">
+                          Recommended overrides which terminal masters and harbor planners should execute today:
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                          {planResult.suggestedMitigationActions.map((action, idx) => (
+                            <div key={idx} className="bg-slate-900 border border-slate-800/80 p-3 rounded-lg flex items-start gap-3 transition-colors hover:border-slate-700">
+                              <span className="font-bold text-[10px] text-emerald-400 font-mono bg-emerald-500/10 border border-emerald-500/10 px-2 py-0.5 rounded shrink-0">
+                                COMMAND {idx+1}
+                              </span>
+                              <p className="text-xs text-slate-300 leading-relaxed text-[11px] md:text-xs">
+                                {action}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                    </div>
                   </div>
-                  <div className="bg-slate-950/80 px-4 py-2.5 rounded-xl border border-slate-800 shrink-0 self-end md:self-auto">
-                    <span className="text-[10px] text-slate-500 uppercase block font-semibold">Stowage Approval Code</span>
-                    <span className="text-xs text-sky-400 font-mono font-bold tracking-widest">TS-APPROVED-AI-77A</span>
-                  </div>
-                </div>
+                )}
 
               </div>
-
             </div>
           ) : (
             <div className="bg-slate-900/10 border border-slate-800/80 rounded-2xl p-10 text-center space-y-4 max-w-2xl mx-auto flex flex-col items-center justify-center">
