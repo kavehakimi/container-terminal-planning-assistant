@@ -26,7 +26,13 @@ import {
   Wifi,
   WifiOff,
   Server,
-  ShieldAlert
+  ShieldAlert,
+  Shield,
+  History,
+  UserCheck,
+  Cpu,
+  Fingerprint,
+  RefreshCw
 } from 'lucide-react';
 import Header from './components/Header';
 import DischargeLoader from './components/DischargeLoader';
@@ -90,6 +96,62 @@ export default function App() {
   const [copied, setCopied] = useState(false);
   const [activeHotspot, setActiveHotspot] = useState<string | null>(null);
 
+  // New States for Secure Agent Features
+  const [decisionStatus, setDecisionStatus] = useState<'Pending Review' | 'Approved' | 'Revision Requested' | 'Rejected'>('Pending Review');
+  const [revisionNotes, setRevisionNotes] = useState('');
+  const [showRevisionInput, setShowRevisionInput] = useState(false);
+  const [currentVersion, setCurrentVersion] = useState(1);
+  const [revisionHistory, setRevisionHistory] = useState<Array<{
+    versionFrom: number;
+    versionTo: number;
+    timestamp: string;
+    notes: string;
+    diff: {
+      durationFrom: number;
+      durationTo: number;
+      cranesFrom: number;
+      cranesTo: number;
+      congestionFrom: string;
+      congestionTo: string;
+      safetyFrom: number;
+      safetyTo: number;
+    }
+  }>>([]);
+  const [auditTrail, setAuditTrail] = useState<Array<{
+    id: string;
+    vessel: string;
+    timestamp: string;
+    user: string;
+    action: string;
+    risk: 'Low' | 'Medium' | 'High';
+    status: 'Pending' | 'Approved' | 'Revision Requested' | 'Rejected';
+    skillsExecuted: string[];
+    details: string;
+  }>>([
+    {
+      id: "TX-9048",
+      vessel: "MSC Daniela v419",
+      timestamp: "2026-06-24T10:15:00-07:00",
+      user: "khakimi@gmail.com",
+      action: "Approved Plan v1",
+      risk: "Medium",
+      status: "Approved",
+      skillsExecuted: ["Vessel Planning", "Quay Crane Allocation", "Yard Planning", "Risk Assessment", "Decision Support"],
+      details: "5 Quay Cranes allocated, yard capacity stable."
+    },
+    {
+      id: "TX-9021",
+      vessel: "CMA CGM Blue Marlin v01",
+      timestamp: "2026-06-24T08:45:00-07:00",
+      user: "khakimi@gmail.com",
+      action: "Rejected Plan v1",
+      risk: "High",
+      status: "Rejected",
+      skillsExecuted: ["Vessel Planning", "Quay Crane Allocation", "Yard Planning", "Risk Assessment", "Decision Support"],
+      details: "Rejected due to critical restow conflicts on hatch 3."
+    }
+  ]);
+
   // Diagnostics connection status state
   const [diagnostics, setDiagnostics] = useState<{
     apiKeyConfigured: boolean;
@@ -113,6 +175,68 @@ export default function App() {
   const congestionFactor = inputs.congestion === 'High' ? 1.25 : inputs.congestion === 'Medium' ? 1.08 : 1.0;
   const priorityFactor = inputs.priority === 'Critical' ? 0.95 : inputs.priority === 'Urgent' ? 0.98 : 1.0;
   const calculatedLiveDuration = Math.round(theoreticalDuration * congestionFactor * priorityFactor * 10) / 10;
+
+  // Triage classifications and parameters
+  const getTriageTier = () => {
+    if (inputs.congestion === 'High' || inputs.priority === 'Critical') {
+      return {
+        level: 'High-risk: manager approval required',
+        color: 'border-rose-500/30 bg-rose-500/5 text-rose-400',
+        badge: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
+        iconColor: 'text-rose-400',
+        desc: 'This plan carries significant operational friction. Senior manager authorization is mandatory to execute.'
+      };
+    }
+    if (inputs.congestion === 'Medium' || inputs.priority === 'Urgent' || inputs.cranesCount < 3) {
+      return {
+        level: 'Needs planner review',
+        color: 'border-amber-500/30 bg-amber-500/5 text-amber-400',
+        badge: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+        iconColor: 'text-amber-400',
+        desc: 'Moderate coordination required. Review cranes, yard stacking block allocations, and gate congestion indices.'
+      };
+    }
+    return {
+      level: 'Auto-acceptable',
+      color: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-400',
+      badge: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+      iconColor: 'text-emerald-400',
+      desc: 'Operational parameters are safe and stable. Suitable for immediate direct stowing workflow.'
+    };
+  };
+
+  const triage = getTriageTier();
+  const isMediumOrHighRisk = inputs.congestion === 'High' || inputs.congestion === 'Medium' || inputs.priority === 'Critical' || inputs.priority === 'Urgent' || inputs.cranesCount < 3;
+
+  const handleTriageAction = (status: 'Approved' | 'Rejected' | 'Revision Requested', comments = "") => {
+    setDecisionStatus(status);
+    if (status === 'Revision Requested') {
+      setShowRevisionInput(true);
+    } else {
+      setShowRevisionInput(false);
+      // Log in audit trail
+      const newAudit = {
+        id: `TX-${Math.floor(1000 + Math.random() * 9000)}`,
+        vessel: inputs.vesselName,
+        timestamp: new Date().toISOString(),
+        user: "khakimi@gmail.com",
+        action: `Planner ${status}`,
+        risk: planResult?.safetyIndex && planResult.safetyIndex < 60 ? 'High' as const : planResult?.safetyIndex && planResult.safetyIndex < 80 ? 'Medium' as const : 'Low' as const,
+        status: status,
+        skillsExecuted: ["Vessel Planning", "Quay Crane Allocation", "Yard Planning", "Risk Assessment", "Decision Support"],
+        details: `${status} by Terminal Planner khakimi@gmail.com. Comments: ${comments || "Standard decision signature"}`
+      };
+      setAuditTrail(prev => [newAudit, ...prev]);
+    }
+  };
+
+  const submitRevision = () => {
+    if (!revisionNotes.trim()) return;
+    generateOperationalPlan(false, false, true, revisionNotes);
+    setDecisionStatus('Revision Requested');
+    setShowRevisionInput(false);
+    setRevisionNotes('');
+  };
 
   // Terminal Interactive Hotspots (Overlay on Container Terminal Reference graphic)
   const terminalHotspots = [
@@ -178,10 +302,14 @@ export default function App() {
     setInputs(preset);
   };
 
-  const generateOperationalPlan = async (isInitial = false, allowFallback = false) => {
+  const generateOperationalPlan = async (isInitial = false, allowFallback = false, isRevisionRequest = false, revisionComments = "") => {
     setLoading(true);
     setError(null);
     setErrorDetails(null);
+    
+    const prevPlan = planResult;
+    const prevInputs = { ...inputs };
+
     try {
       const response = await fetch('/api/generate-plan', {
         method: 'POST',
@@ -204,9 +332,62 @@ export default function App() {
 
       const data = await response.json();
       setPlanResult(data);
+
+      if (isRevisionRequest && prevPlan) {
+        const nextVersion = currentVersion + 1;
+        setCurrentVersion(nextVersion);
+        setDecisionStatus('Pending Review');
+
+        const newRevision = {
+          versionFrom: currentVersion,
+          versionTo: nextVersion,
+          timestamp: new Date().toLocaleTimeString(),
+          notes: revisionComments || "Manual operational parameter adjustment.",
+          diff: {
+            durationFrom: prevPlan.estimatedDuration,
+            durationTo: data.estimatedDuration,
+            cranesFrom: prevInputs.cranesCount,
+            cranesTo: inputs.cranesCount,
+            congestionFrom: prevInputs.congestion,
+            congestionTo: inputs.congestion,
+            safetyFrom: prevPlan.safetyIndex,
+            safetyTo: data.safetyIndex,
+          }
+        };
+        setRevisionHistory(prev => [newRevision, ...prev]);
+
+        const newAudit = {
+          id: `TX-${Math.floor(1000 + Math.random() * 9000)}`,
+          vessel: inputs.vesselName,
+          timestamp: new Date().toISOString(),
+          user: "khakimi@gmail.com",
+          action: `Generated Revision v${nextVersion}`,
+          risk: data.safetyIndex < 60 ? 'High' as const : data.safetyIndex < 80 ? 'Medium' as const : 'Low' as const,
+          status: 'Pending' as const,
+          skillsExecuted: ["Vessel Planning", "Quay Crane Allocation", "Yard Planning", "Risk Assessment", "Decision Support"],
+          details: `Revised from v${currentVersion}. Planner Notes: ${revisionComments || "Inputs modified"}`
+        };
+        setAuditTrail(prev => [newAudit, ...prev]);
+      } else {
+        setCurrentVersion(1);
+        setRevisionHistory([]);
+        setDecisionStatus('Pending Review');
+
+        const newAudit = {
+          id: `TX-${Math.floor(1000 + Math.random() * 9000)}`,
+          vessel: inputs.vesselName,
+          timestamp: new Date().toISOString(),
+          user: "khakimi@gmail.com",
+          action: "Generated Plan v1",
+          risk: data.safetyIndex < 60 ? 'High' as const : data.safetyIndex < 80 ? 'Medium' as const : 'Low' as const,
+          status: 'Pending' as const,
+          skillsExecuted: ["Vessel Planning", "Quay Crane Allocation", "Yard Planning", "Risk Assessment", "Decision Support"],
+          details: `Initial operational stowage run for ${inputs.vesselName}.`
+        };
+        setAuditTrail(prev => [newAudit, ...prev]);
+      }
     } catch (err: any) {
       console.error("Error generating operational plan:", err);
-      // Ensure we display user-friendly explanation with live server-side insights
       setError(err?.message || "Unable to process AI-Optimized Plan. Please check connection and try again.");
       setErrorDetails(err?.details || "Failed to establish a reliable server-side connection to `/api/generate-plan`. Please verify your network and port bindings are healthy.");
     } finally {
@@ -753,45 +934,346 @@ PORT TERMINAL AUTOMATION PLANNER DECISION-SUPPORT REPORT`;
             </div>
           ) : planResult ? (
             <div className="space-y-6">
-              
-              {/* Dynamic Port Metrics Summary Header */}
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Est. Duration</span>
-                  <div className="flex items-baseline gap-1 mt-1">
-                    <span className="text-xl font-mono font-bold text-sky-400">{planResult.estimatedDuration}</span>
-                    <span className="text-[10px] text-slate-500">hrs</span>
+                
+                {/* Human-In-The-Loop Triage & Security Guardrails Grid */}
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                  
+                  {/* Human-in-the-Loop Triage Panel (7 cols) */}
+                  <div className="xl:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-5 md:p-6 shadow-xl relative overflow-hidden flex flex-col justify-between">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-sky-500/[0.01] rounded-full -translate-y-4 translate-x-4"></div>
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div className="flex items-center gap-2">
+                          <UserCheck className="w-5 h-5 text-sky-400 animate-pulse" />
+                          <div>
+                            <h3 className="text-sm font-semibold text-white tracking-wide">Human-in-the-Loop Triage</h3>
+                            <p className="text-[11px] text-slate-500">Every AI operational proposal requires an explicit planner action.</p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-mono bg-slate-950 text-slate-400 px-2 py-0.5 rounded border border-slate-850">
+                          PROTOTYPE v{currentVersion}.0
+                        </span>
+                      </div>
+
+                      {/* Triage Tier Badge Indicator */}
+                      <div className={`border p-4 rounded-xl space-y-2 ${triage.color}`}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-mono uppercase tracking-widest font-bold">Proposal Classification</span>
+                          <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-mono font-bold border ${triage.badge}`}>
+                            {triage.level.toUpperCase()}
+                          </span>
+                        </div>
+                        <p className="text-xs leading-relaxed text-slate-200">
+                          {triage.desc}
+                        </p>
+                      </div>
+
+                      {/* Current decision status message */}
+                      <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-850 flex items-center justify-between text-xs">
+                        <span className="text-slate-400">Current Planner Decision Status:</span>
+                        <div className="flex items-center gap-1.5 font-mono text-xs">
+                          {decisionStatus === 'Approved' ? (
+                            <span className="text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> APPROVED BY PLANNER
+                            </span>
+                          ) : decisionStatus === 'Rejected' ? (
+                            <span className="text-rose-400 font-bold bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                              <ShieldAlert className="w-3.5 h-3.5" /> REJECTED BY PLANNER
+                            </span>
+                          ) : decisionStatus === 'Revision Requested' ? (
+                            <span className="text-amber-400 font-bold bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '4s' }} /> REVISION IN PROGRESS
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 font-semibold bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-lg flex items-center gap-1.5 animate-pulse">
+                              <Clock className="w-3.5 h-3.5" /> PENDING PLANNER ACTION
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Revision Input (Shown inline) */}
+                      {showRevisionInput && (
+                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-3">
+                          <label className="text-[11px] font-semibold text-slate-300 block uppercase tracking-wide">Enter Revision Instructions</label>
+                          <textarea
+                            value={revisionNotes}
+                            onChange={(e) => setRevisionNotes(e.target.value)}
+                            rows={2}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 px-3 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-amber-500 transition-colors"
+                            placeholder="e.g. Please assign at least 4 Quay Cranes to improve stowage velocity, or schedule direct trucks."
+                          />
+                          <div className="flex items-center justify-end gap-2 text-xs">
+                            <button
+                              onClick={() => setShowRevisionInput(false)}
+                              className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-colors"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={submitRevision}
+                              disabled={!revisionNotes.trim() || loading}
+                              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-1.5 rounded-lg shadow-sm transition-all flex items-center gap-1.5"
+                            >
+                              {loading ? (
+                                <Activity className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <RefreshCw className="w-3.5 h-3.5" />
+                              )}
+                              Submit Revision Request
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Action buttons list */}
+                    <div className="pt-4 mt-4 border-t border-slate-800/80 flex flex-wrap gap-2.5">
+                      <button
+                        onClick={() => handleTriageAction('Approved')}
+                        disabled={decisionStatus === 'Approved' || loading}
+                        className={`flex-1 min-w-[130px] py-2.5 px-3 rounded-xl text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 ${
+                          decisionStatus === 'Approved' 
+                            ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
+                            : 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-600 hover:border-emerald-500 shadow-sm active:scale-95'
+                        }`}
+                      >
+                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                        Approve Plan
+                      </button>
+
+                      <button
+                        onClick={() => handleTriageAction('Revision Requested')}
+                        disabled={loading}
+                        className={`flex-1 min-w-[130px] py-2.5 px-3 rounded-xl text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 ${
+                          decisionStatus === 'Revision Requested' || showRevisionInput
+                            ? 'bg-amber-500/10 border-amber-500/25 text-amber-400'
+                            : 'bg-slate-950 hover:bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 active:scale-95'
+                        }`}
+                      >
+                        <RefreshCw className="w-4 h-4 shrink-0" />
+                        Request Revision
+                      </button>
+
+                      <button
+                        onClick={() => handleTriageAction('Rejected')}
+                        disabled={decisionStatus === 'Rejected' || loading}
+                        className={`flex-1 min-w-[130px] py-2.5 px-3 rounded-xl text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 ${
+                          decisionStatus === 'Rejected' 
+                            ? 'bg-rose-500/10 border-rose-500/25 text-rose-400'
+                            : 'bg-slate-950 hover:bg-rose-950/20 text-slate-300 hover:text-rose-400 border-slate-800 hover:border-rose-900/40 active:scale-95'
+                        }`}
+                      >
+                        <ShieldAlert className="w-4 h-4 shrink-0" />
+                        Reject Plan
+                      </button>
+                    </div>
+
+                    <p className="text-[10px] text-slate-500 italic leading-relaxed mt-3 pt-2.5 border-t border-slate-800/40">
+                      ℹ️ <strong>Decision Support Prototype Notice:</strong> The Multi-Skill AI System is a decision-support prototype and NOT an autonomous operational control system. All recommended allocations and turnaround predictions must be reviewed, calibrated, and authorized by certified Terminal Planners or Duty Managers before actual execution.
+                    </p>
+                  </div>
+
+                  {/* Trust & Safety Guardrails (5 cols) */}
+                  <div className="xl:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-5 md:p-6 shadow-xl flex flex-col justify-between">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div className="flex items-center gap-2">
+                          <Shield className="w-5 h-5 text-emerald-400" />
+                          <div>
+                            <h3 className="text-sm font-semibold text-white tracking-wide">Trust & Safety Guardrails</h3>
+                            <p className="text-[11px] text-slate-500">Active policy enforcement, constraint checking, and warning triggers.</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Advisory notice */}
+                      <div className="p-3 bg-slate-950/80 border-l-2 border-emerald-500 rounded-r-xl text-[11px] text-slate-350 leading-relaxed font-sans">
+                        <strong>⚠️ SECURE AI GUARDRAIL:</strong> Recommendations generated by the AI agent are purely advisory. All final operational commands must be authorized by a certified Terminal Planner or Duty Manager.
+                      </div>
+
+                      {/* Risk review indicator */}
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-850">
+                        <span className="text-xs text-slate-400">Risk Assessment Indicator:</span>
+                        {isMediumOrHighRisk ? (
+                          <span className="text-[10px] px-2.5 py-1 rounded bg-rose-500/10 border border-rose-500/25 text-rose-400 font-bold font-mono">
+                            ⚠️ HUMAN REVIEW REQUIRED
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 font-bold font-mono">
+                            ✅ SYSTEM APPROVED DIRECT REVIEW
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Dynamic Situational Warnings */}
+                      <div className="space-y-2">
+                        <span className="text-[10px] uppercase font-bold text-slate-450 tracking-wider block">Real-time Warning Indicators:</span>
+                        
+                        <div className="space-y-1.5">
+                          {inputs.congestion === 'High' && (
+                            <div className="bg-rose-500/5 border border-rose-950/30 px-3 py-2 rounded-lg flex items-start gap-2 text-[11px] text-rose-350">
+                              <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                              <span><strong>High Congestion Alert:</strong> Yard blocks are currently choked. Containers may experience major shuffle and positioning delays.</span>
+                            </div>
+                          )}
+
+                          {inputs.cranesCount < 3 && (
+                            <div className="bg-amber-500/5 border border-amber-950/30 px-3 py-2 rounded-lg flex items-start gap-2 text-[11px] text-amber-350">
+                              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                              <span><strong>Insufficient Cranes:</strong> Fewer than 3 cranes are allocated for a major operation, extending berth occupancy.</span>
+                            </div>
+                          )}
+
+                          {inputs.priority === 'Critical' && (
+                            <div className="bg-rose-500/5 border border-rose-950/30 px-3 py-2 rounded-lg flex items-start gap-2 text-[11px] text-rose-350">
+                              <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                              <span><strong>Critical Priority Task:</strong> This vessel has demurrages or special handling demands. Interference with adjacent berths likely.</span>
+                            </div>
+                          )}
+
+                          {(!inputs.notes || inputs.notes.trim().length < 15) && (
+                            <div className="bg-amber-500/5 border border-amber-950/30 px-3 py-2 rounded-lg flex items-start gap-2 text-[11px] text-amber-350">
+                              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                              <span><strong>Incomplete Constraint Notes:</strong> Constraint notes are empty or brief. Missing bay, reefers, or hazardous cargo specifications.</span>
+                            </div>
+                          )}
+
+                          {inputs.congestion !== 'High' && inputs.cranesCount >= 3 && inputs.priority !== 'Critical' && inputs.notes && inputs.notes.trim().length >= 15 && (
+                            <div className="bg-emerald-500/5 border border-emerald-950/30 px-3 py-2 rounded-lg flex items-center gap-2 text-[11px] text-emerald-350">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                              <span>All situational safety parameters reside inside stable limits.</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Vibe Diff Concept - Plan Revision Summary (Visible when revisions exist) */}
+                {revisionHistory.length > 0 && (
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 md:p-6 shadow-xl space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div className="flex items-center gap-2">
+                        <History className="w-5 h-5 text-amber-400" />
+                        <div>
+                          <h3 className="text-sm font-semibold text-white tracking-wide">Plan Revision Summary (Vibe Diff Concept)</h3>
+                          <p className="text-[11px] text-slate-500">Compare what changed between the initial AI plan and revised terminal models.</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-400 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-lg">
+                        {revisionHistory.length} REVISION(S) STORED
+                      </span>
+                    </div>
+
+                    <div className="space-y-4">
+                      {revisionHistory.map((rev, idx) => {
+                        const durationDiff = Math.round((rev.diff.durationTo - rev.diff.durationFrom) * 10) / 10;
+                        const cranesDiff = rev.diff.cranesTo - rev.diff.cranesFrom;
+                        const safetyDiff = rev.diff.safetyTo - rev.diff.safetyFrom;
+
+                        return (
+                          <div key={idx} className="bg-slate-950 rounded-xl border border-slate-850 p-4 space-y-3.5">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-900 pb-2">
+                              <span className="text-xs font-mono font-bold text-amber-400">
+                                Revision #{rev.versionTo} (v{rev.versionFrom} → v{rev.versionTo})
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-mono">Timestamp: {rev.timestamp}</span>
+                            </div>
+
+                            <p className="text-xs text-slate-300 leading-relaxed italic bg-slate-900/50 p-2.5 rounded border border-slate-900">
+                              <strong>Planner Instruction:</strong> "{rev.notes}"
+                            </p>
+
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                              <div className="p-2 bg-slate-900/40 rounded-lg border border-slate-900">
+                                <span className="text-[9px] text-slate-550 block uppercase font-bold tracking-wider">Turnaround Time</span>
+                                <span className="text-xs font-mono font-bold text-slate-300 block mt-0.5">
+                                  {rev.diff.durationFrom}h → {rev.diff.durationTo}h
+                                </span>
+                                <span className={`text-[10px] font-mono font-bold ${durationDiff < 0 ? 'text-emerald-400' : durationDiff > 0 ? 'text-rose-400' : 'text-slate-400'}`}>
+                                  {durationDiff < 0 ? `Reduced by ${Math.abs(durationDiff)}h` : durationDiff > 0 ? `Increased by ${durationDiff}h` : 'No Change'}
+                                </span>
+                              </div>
+
+                              <div className="p-2 bg-slate-900/40 rounded-lg border border-slate-900">
+                                <span className="text-[9px] text-slate-550 block uppercase font-bold tracking-wider">Quay Cranes</span>
+                                <span className="text-xs font-mono font-bold text-slate-300 block mt-0.5">
+                                  {rev.diff.cranesFrom} QCs → {rev.diff.cranesTo} QCs
+                                </span>
+                                <span className={`text-[10px] font-mono font-bold ${cranesDiff > 0 ? 'text-emerald-400' : cranesDiff < 0 ? 'text-rose-400' : 'text-slate-400'}`}>
+                                  {cranesDiff > 0 ? `Added ${cranesDiff} QC` : cranesDiff < 0 ? `Removed ${Math.abs(cranesDiff)} QC` : 'No Change'}
+                                </span>
+                              </div>
+
+                              <div className="p-2 bg-slate-900/40 rounded-lg border border-slate-900">
+                                <span className="text-[9px] text-slate-550 block uppercase font-bold tracking-wider">Yard Congestion</span>
+                                <span className="text-xs font-mono font-bold text-slate-300 block mt-0.5">
+                                  {rev.diff.congestionFrom} → {rev.diff.congestionTo}
+                                </span>
+                                <span className={`text-[10px] font-mono font-bold ${rev.diff.congestionFrom !== rev.diff.congestionTo ? 'text-sky-350' : 'text-slate-400'}`}>
+                                  {rev.diff.congestionFrom !== rev.diff.congestionTo ? 'Yard state updated' : 'No Change'}
+                                </span>
+                              </div>
+
+                              <div className="p-2 bg-slate-900/40 rounded-lg border border-slate-900">
+                                <span className="text-[9px] text-slate-550 block uppercase font-bold tracking-wider">Stability Cushion</span>
+                                <span className="text-xs font-mono font-bold text-slate-300 block mt-0.5">
+                                  {rev.diff.safetyFrom}% → {rev.diff.safetyTo}%
+                                </span>
+                                <span className={`text-[10px] font-mono font-bold ${safetyDiff > 0 ? 'text-emerald-400' : safetyDiff < 0 ? 'text-rose-400' : 'text-slate-400'}`}>
+                                  {safetyDiff > 0 ? `Improved +${safetyDiff}%` : safetyDiff < 0 ? `Dropped ${safetyDiff}%` : 'No Change'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Dynamic Port Metrics Summary Header */}
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between animate-fade-in">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Est. Duration</span>
+                    <div className="flex items-baseline gap-1 mt-1">
+                      <span className="text-xl font-mono font-bold text-sky-400">{planResult.estimatedDuration}</span>
+                      <span className="text-[10px] text-slate-500">hrs</span>
+                    </div>
+                  </div>
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Assigned QCs</span>
+                    <div className="flex items-baseline gap-1 mt-1">
+                      <span className="text-xl font-mono font-bold text-white">{inputs.cranesCount}</span>
+                      <span className="text-[10px] text-slate-500 font-medium text-slate-400">cranes</span>
+                    </div>
+                  </div>
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Post-Ops Congestion</span>
+                    <div className="flex items-baseline gap-1 mt-1">
+                      <span className={`text-xl font-mono font-bold ${planResult.congestionIndex > 75 ? 'text-rose-400' : planResult.congestionIndex > 45 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                        {planResult.congestionIndex}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Stability Index</span>
+                    <div className="flex items-baseline gap-1 mt-1">
+                      <span className="text-xl font-mono font-bold text-teal-400">{planResult.safetyIndex}%</span>
+                    </div>
+                  </div>
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl col-span-2 lg:col-span-1 p-3.5 flex flex-col justify-between">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Priority Rank</span>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className={`w-2 h-2 rounded-full ${inputs.priority === 'Critical' ? 'bg-rose-500 animate-pulse' : 'bg-sky-400'}`}></span>
+                      <span className="text-xs font-mono font-bold text-slate-200">{inputs.priority}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Assigned QCs</span>
-                  <div className="flex items-baseline gap-1 mt-1">
-                    <span className="text-xl font-mono font-bold text-white">{inputs.cranesCount}</span>
-                    <span className="text-[10px] text-slate-500 font-medium text-slate-400">cranes</span>
-                  </div>
-                </div>
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Post-Ops Congestion</span>
-                  <div className="flex items-baseline gap-1 mt-1">
-                    <span className={`text-xl font-mono font-bold ${planResult.congestionIndex > 75 ? 'text-red-400' : planResult.congestionIndex > 45 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                      {planResult.congestionIndex}%
-                    </span>
-                  </div>
-                </div>
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Stability Index</span>
-                  <div className="flex items-baseline gap-1 mt-1">
-                    <span className="text-xl font-mono font-bold text-teal-400">{planResult.safetyIndex}%</span>
-                  </div>
-                </div>
-                <div className="bg-slate-900 border border-slate-800 rounded-xl col-span-2 lg:col-span-1 p-3.5 flex flex-col justify-between">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Priority Rank</span>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <span className={`w-2 h-2 rounded-full ${inputs.priority === 'Critical' ? 'bg-red-500 animate-pulse' : 'bg-sky-400'}`}></span>
-                    <span className="text-xs font-mono font-bold text-slate-200">{inputs.priority}</span>
-                  </div>
-                </div>
-              </div>
 
               {/* Subtabs to navigate dynamic Multi-Skill sections */}
               <div className="flex border-b border-slate-800 gap-1 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
